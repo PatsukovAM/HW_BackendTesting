@@ -12,9 +12,7 @@ import java.io.InputStream;
 import java.util.Properties;
 
 
-
-
-@TestMethodOrder (MethodOrderer.OrderAnnotation.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public abstract class BaseTest {
     static Properties properties = new Properties();
     static String token;

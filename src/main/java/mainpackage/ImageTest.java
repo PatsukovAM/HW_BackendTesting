@@ -5,6 +5,7 @@ import io.restassured.response.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.IsEqual.equalToObject;
@@ -20,8 +21,8 @@ import static io.restassured.RestAssured.given;
 public class ImageTest extends BaseTest {
     static Properties imageTestProperties = new Properties();
     private static String imageBase64;
-    static String uploadedImageId=null;
-    static String uploadedImageDeleteHash=null;
+    static String uploadedImageId = null;
+    static String uploadedImageDeleteHash = null;
     private final String PATH_TO_IMAGE = "src/main/resources/image.jpeg";
     static String encodeFile;
 
@@ -104,7 +105,8 @@ public class ImageTest extends BaseTest {
                 .then()
                 .statusCode(200)
                 .body("success", equalTo(true))
-                .body("data", equalTo("unfavorited"));;
+                .body("data", equalTo("unfavorited"));
+        ;
 
     }
 
@@ -139,7 +141,7 @@ public class ImageTest extends BaseTest {
     @Order(7)
     @Test
     void NegativeUploadFileNullValueTest() {
-          given()
+        given()
                 .headers("Authorization", token)
                 .multiPart("image", "")
                 .formParam("type", "image/jpeg")
