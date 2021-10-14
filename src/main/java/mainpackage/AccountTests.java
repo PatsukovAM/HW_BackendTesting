@@ -1,43 +1,48 @@
 package mainpackage;
 
 import io.restassured.response.Response;
+import mainpackage.dto.AccountResponse;
 import org.junit.jupiter.api.Test;
-
+import org.junit.jupiter.api.Order;
 import static io.restassured.RestAssured.given;
+import static mainpackage.dto.EndPoints.URL_ACCAUNT;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 public class AccountTests extends BaseTest {
 
+    @Order(4)
     @Test
     void getAccountInfoTest() {
-        given()
-                .header("Authorization", token)
-                .when()
-                .get("https://api.imgur.com/3/account/{username}", username)
+        AccountResponse accountResponse =given(requestSpecificationWithAuth,positiveResponseSpecification)
+                .get(URL_ACCAUNT, username)
                 .then()
-                .statusCode(200);
+                .extract()
+                .body()
+                .as(AccountResponse.class);
     }
 
+    @Order(2)
     @Test
     void getAccountInfoWithLoggingTest() {
-        given()
-                .header("Authorization", token)
+        AccountResponse accountResponse =given(requestSpecificationWithAuth)
                 .log()
                 .method()
                 .log()
                 .uri()
                 .when()
-                .get("https://api.imgur.com/3/account/{username}", username)
-                .prettyPeek()
+                .get(URL_ACCAUNT, username)
                 .then()
-                .statusCode(200);
+                .spec(positiveResponseSpecification)
+                .extract()
+                .body()
+                .as(AccountResponse.class);
     }
 
+    @Order(3)
     @Test
     void getAccountInfoWithAsssertionsInGivaenTest() {
-        given()
-                .header("Authorization", token)
+        AccountResponse accountResponse =given(requestSpecificationWithAuth)
                 .log()
                 .method()
                 .log()
@@ -49,24 +54,31 @@ public class AccountTests extends BaseTest {
                 .body("status", equalTo(200))
                 .contentType("application/json")
                 .when()
-                .get("https://api.imgur.com/3/account/{username}", username)
-                .prettyPeek();
+                .get(URL_ACCAUNT, username)
+                .then()
+                .extract()
+                .body()
+                .as(AccountResponse.class);
     }
 
+    @Order(1)
     @Test
     void getAccountInfoWithAsssertionsAfterTest() {
-        Response response = given()
-                .header("Authorization", token)
+        AccountResponse accountResponse= given(requestSpecificationWithAuth)
                 .log()
                 .method()
                 .log()
                 .uri()
                 .when()
-                .get("https://api.imgur.com/3/account/{username}", username)
-                .prettyPeek();
+                .get(URL_ACCAUNT, username)
+                .then()
+                .extract()
+                .body()
+                .as(AccountResponse.class);
 
-        assertThat(response.jsonPath().get("data.url"), equalTo(username));
-        assertThat(response.jsonPath().get("success"), equalTo(true));
-        assertThat(response.jsonPath().get("status"), equalTo(200));
+        assertThat(accountResponse.getData().getUrl(),equalTo(username));
+        assertThat(accountResponse.getStatus(),equalTo(200));
+        assertThat(accountResponse.getSuccess(),equalTo(true));
+
     }
 }

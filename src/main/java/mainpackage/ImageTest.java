@@ -1,214 +1,224 @@
 package mainpackage;
 
 
+import io.restassured.builder.MultiPartSpecBuilder;
+import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.response.Response;
+import io.restassured.response.ValidatableResponse;
+import io.restassured.specification.MultiPartSpecification;
+import io.restassured.specification.RequestSpecification;
+import mainpackage.dto.PostImageResponse;
+import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
+import static io.restassured.RestAssured.*;
+import static mainpackage.dto.EndPoints.*;
+import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.IsEqual.equalToObject;
 import static org.junit.jupiter.api.Assertions.*;
-
 import java.io.*;
 import java.util.Base64;
 import java.util.Properties;
 
-import static io.restassured.RestAssured.given;
-
 
 public class ImageTest extends BaseTest {
-    static Properties imageTestProperties = new Properties();
+
     private static String imageBase64;
     static String uploadedImageId = null;
     static String uploadedImageDeleteHash = null;
-    private final String PATH_TO_IMAGE = "src/main/resources/image.jpeg";
-    static String encodeFile;
 
-    private static void getImageProperties() {
-        try (InputStream image = new FileInputStream("src/main/resources/imageBase64.properties")) {
-            properties.load(image);
+    static String encodeFile;
+    MultiPartSpecification base64MultiPartSpec;
+    MultiPartSpecification multiPartSpecWithFile;
+    static RequestSpecification requestSpecificationWithAuthAndMultipartImage;
+    static RequestSpecification requestSpecificationToUpdate;
+
+    private byte[] getFileContent() {
+        byte[] beteArray= new byte[0];
+        try  {
+            beteArray= FileUtils.readFileToByteArray(new File(PATH_TO_IMAGE));
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return beteArray;
     }
 
-/*    @BeforeEach
+    @BeforeEach
     void beforeTest() {
-        //getImageProperties();
-        //imageBase64=imageTestProperties.getProperty("image");
 
-        // byte[] byteArray = getFileContent();
-        //  encodeFile = Base64.getEncoder().encodeToString(byteArray);
-    }*/
+         byte[] byteArray = getFileContent();
+         encodeFile = Base64.getEncoder().encodeToString(byteArray);
+
+         base64MultiPartSpec = new MultiPartSpecBuilder(encodeFile)
+                 .controlName("image")
+                 .build();
+
+         multiPartSpecWithFile =new MultiPartSpecBuilder(new File(PATH_TO_IMAGE))
+                 .controlName("image")
+                 .build();
+
+         requestSpecificationWithAuthAndMultipartImage = new RequestSpecBuilder()
+                 .addRequestSpecification(requestSpecificationWithAuth)
+                 .addMultiPart(multiPartSpecWithFile)
+                 .addFormParam("type", "image/jpeg")
+                 .addFormParam("title", "hw_image")
+                 .build();
+
+         requestSpecificationToUpdate = new RequestSpecBuilder()
+                 .addFormParam("title", "updated title")
+                 .addFormParam("description", "updated description")
+                 .build();
+
+    }
 
     @Order(1)
     @Test
     void PositiveUploadFileTest() {
-        Response imageLoadResponse = given()
-                .headers("Authorization", token)
-                .multiPart("image", new File(PATH_TO_IMAGE))
-                .formParam("type", "image/jpeg")
-                .formParam("title", "hw_image")
-                .when()
-                .post("https://api.imgur.com/3/upload")
-                .prettyPeek();
 
+        PostImageResponse postImageResponse = given(requestSpecificationWithAuthAndMultipartImage,positiveResponseSpecification)
+                .post(URL_UPLOAD)
+                .prettyPeek()
+                .then()
+                .extract()
+                .body()
+                .as(PostImageResponse.class);
 
-        assertThat(imageLoadResponse.jsonPath().get("success"), equalTo(true));
-        assertThat(imageLoadResponse.jsonPath().get("status"), equalTo(200));
-
-        uploadedImageId = imageLoadResponse.jsonPath().getString("data.id");
+        uploadedImageId = postImageResponse.getData().getId();
         assertNotNull(uploadedImageId);
-        uploadedImageDeleteHash = imageLoadResponse.jsonPath().getString("data.deletehash");
+        uploadedImageDeleteHash = postImageResponse.getData().getDeletehash();
         assertNotNull(uploadedImageDeleteHash);
-
     }
-
 
     @Order(2)
     @Test
     void PositiveCheckUploadFileTest() {
-        given()
-                .headers("Authorization", token)
+        given(requestSpecificationWithAuth)
                 .when()
-                .get("https://api.imgur.com/3/image/{uploadImageId}", uploadedImageId)
-                .prettyPeek()
-                .then()
-                .statusCode(200);
+                .get(URL_UPLOADIMAGEID, uploadedImageId);
     }
 
     @Order(3)
     @Test
     void PositiveCheckFavoriteLabelOnTest() {
-        given()
-                .headers("Authorization", token)
+        given(requestSpecificationWithAuth)
                 .when()
-                .post("https://api.imgur.com/3/image/{uploadedImageId}/favorite", uploadedImageId)
-                .prettyPeek()
+                .post(URL_FAVORITED, uploadedImageId)
                 .then()
-                .statusCode(200)
-                .body("success", equalTo(true))
-                .body("data", equalTo("favorited"));
-
+                .body("data",equalTo("favorited"));
     }
 
     @Order(4)
     @Test
     void PositiveCheckFavoriteLabelOffTest() {
-        given()
-                .headers("Authorization", token)
+                given(requestSpecificationWithAuth)
                 .when()
-                .post("https://api.imgur.com/3/image/{uploadedImageId}/favorite", uploadedImageId)
-                .prettyPeek()
+                .post(URL_FAVORITED, uploadedImageId)
                 .then()
-                .statusCode(200)
-                .body("success", equalTo(true))
-                .body("data", equalTo("unfavorited"));
-        ;
+                .body("data",equalTo("unfavorited"));
+
+
 
     }
 
     @Order(5)
     @Test
     void NegativeCheckDeleteUploadedImageNoAuthUserTest() {
-        given()
-                .when()
-                .delete("https://api.imgur.com/3/image/{uploadImageId}", uploadedImageId)
-                .prettyPeek()
+        given(requestSpecificationNoAuth,negativeResponceSpecification)
+                .delete(URL_DELETEHASH, uploadedImageDeleteHash)
                 .then()
-                .statusCode(401)
-                .body("success", equalTo(false))
                 .body("data.method", equalTo("DELETE"))
-                .body("data.error", equalTo("Authentication required"));
+                .body("data.error", equalTo("Authentication required"))
+                .statusCode(401);
     }
 
     @Order(6)
     @Test
     void PositiveCheckDeleteUploadedImageAuthUserTest() {
-        given()
-                .headers("Authorization", token)
+        given(requestSpecificationWithAuth)
                 .when()
-                .delete("https://api.imgur.com/3/image/{uploadImageId}", uploadedImageId)
-                .prettyPeek()
+                .delete(URL_UPLOADIMAGEID, uploadedImageId)
                 .then()
-                .statusCode(200)
-                .body("success", equalTo(true))
                 .body("data", equalTo(true));
     }
 
     @Order(7)
     @Test
     void NegativeUploadFileNullValueTest() {
-        given()
-                .headers("Authorization", token)
+        given(requestSpecificationWithAuth)
                 .multiPart("image", "")
-                .formParam("type", "image/jpeg")
-                .formParam("title", "hw_image")
                 .when()
-                .post("https://api.imgur.com/3/upload")
-                .prettyPeek()
+                .post(URL_UPLOAD)
                 .then()
-                .statusCode(400)
-                .body("success", equalTo(false))
-                .body("data.method", equalTo("POST"))
+                .spec(negativeResponceSpecification)
                 .body("data.error", equalTo("Bad Request"));
     }
 
     @Order(8)
     @Test
-    void PositiveUploadFileNoAuthUserTest() {
-        Response imageLoadResponse = given()
-                .headers("Authorization", token)
-                .multiPart("image", new File(PATH_TO_IMAGE))
-                .formParam("type", "image/jpeg")
-                .formParam("title", "hw_image")
+    void PositiveUploadBase64FileTest() {
+        PostImageResponse postImageBase64Response = given(requestSpecificationWithAuth)
+                .multiPart(base64MultiPartSpec)
+                .formParam("type", "base64")
                 .when()
-                .post("https://api.imgur.com/3/upload")
-                .prettyPeek();
+                .post(URL_UPLOAD)
+                .prettyPeek()
+                .then()
+                .extract()
+                .body()
+                .as(PostImageResponse.class);
 
-
-        assertThat(imageLoadResponse.jsonPath().get("success"), equalTo(true));
-        assertThat(imageLoadResponse.jsonPath().get("status"), equalTo(200));
-
-        uploadedImageId = imageLoadResponse.jsonPath().getString("data.id");
+        uploadedImageId = postImageBase64Response.getData().getId();
         assertNotNull(uploadedImageId);
-        uploadedImageDeleteHash = imageLoadResponse.jsonPath().getString("data.deletehash");
+        uploadedImageDeleteHash = postImageBase64Response.getData().getDeletehash();
         assertNotNull(uploadedImageDeleteHash);
+
     }
 
     @Order(9)
     @Test
     void PositiveCheckUpdateImageInformationAuthUserTest() {
-        given()
-                .headers("Authorization", token)
-                .formParam("title", "updated title")
-                .formParam("description", "updated description")
+        given(requestSpecificationWithAuth)
+                .spec(requestSpecificationToUpdate)
                 .when()
-                .post("https://api.imgur.com/3/image/{imageDeleteHash}", uploadedImageDeleteHash)
-                .prettyPeek()
+                .post(URL_DELETEHASH, uploadedImageDeleteHash)
                 .then()
-                .statusCode(200)
-                .body("success", equalTo(true))
-                .body("data", equalTo(true));
+                .spec(positiveResponseSpecification);
 
     }
 
     @Order(10)
     @Test
     void NegativeCheckUpdateImageInformationNoAuthUserTest() {
-        given()
-                .formParam("title", "updated title")
-                .formParam("description", "updated description")
-                .when()
-                .post("https://api.imgur.com/3/image/{imageDeleteHash}", uploadedImageDeleteHash)
-                .prettyPeek()
+        given(requestSpecificationToUpdate,negativeResponceSpecification)
+                .post(URL_DELETEHASH, uploadedImageDeleteHash)
                 .then()
                 .statusCode(401)
-                .body("success", equalTo(false))
                 .body("data.method", equalTo("POST"))
                 .body("data.error", equalTo("Authentication required"));
 
     }
+/*    @Order(11)
+    @Test // тут как вариант можно эксепшен ловить, но но это будет ошибка на клиенте. а нам нужен сервер, в постмане такой тест кейс проходил
+    void PositiveUploadFileNoAuthUserTest() {
+        PostImageResponse postImageResponse= given(requestSpecificationNoAuth)
+                .multiPart("image", new File(PATH_TO_IMAGE))
+                .formParam("type", "image/jpeg")
+                .formParam("title", "hw_image")
+                .when()
+                .post(UPLOAD)
+                .prettyPeek()
+                .then()
+                .extract()
+                .body()
+                .as(PostImageResponse.class);
+
+        uploadedImageId = postImageBResponse.getData().getId();
+        assertNotNull(uploadedImageId);
+        uploadedImageDeleteHash = postImageResponse.getData().getDeletehash();
+        assertNotNull(uploadedImageDeleteHash);
+    }*/
 }
