@@ -12,6 +12,6 @@ public class Product {
   Integer id;
   String title;
   Integer price;
-  String categoryTitile;
+  String categoryTitle;
 
 }
